@@ -2,17 +2,17 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
-  FlatList,
   Image,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Localization from 'expo-localization';
 import { I18n } from 'i18n-js';
+import { FlashList } from '@shopify/flash-list';
 
 const { height } = Dimensions.get('window');
 
@@ -45,16 +45,19 @@ interface Article {
   id: number;
   title: string;
   extract: string;
+  image?: string;
 }
 
 const ArticleScreen = ({ article }: { article: Article }) => {
   return (
-    <View style={styles.articleContainer}>
+    <ScrollView contentContainerStyle={styles.articleContainer}>
       <Text style={styles.title}>{article.title}</Text>
+      {article.image && <Image source={{ uri: article.image }} style={styles.articleImage} />}
       <Text style={styles.extract}>{article.extract}</Text>
-    </View>
+    </ScrollView>
   );
 };
+
 export default function Index() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
@@ -66,13 +69,14 @@ export default function Index() {
       setLoading(true);
       setError(null);
       const response = await fetch(
-        'https://en.wikipedia.org/w/api.php?format=json&action=query&generator=random&grnnamespace=0&prop=extracts&exintro&explaintext&grnlimit=10&origin=*',
+        'https://en.wikipedia.org/w/api.php?format=json&action=query&generator=random&grnnamespace=0&prop=extracts|pageimages&piprop=thumbnail&pithumbsize=500&exintro&explaintext&grnlimit=10&origin=*',
       );
       const data = await response.json();
       const articleList = Object.values(data.query.pages).map((page: any) => ({
         id: page.pageid,
         title: page.title,
         extract: page.extract,
+        image: page.thumbnail?.source,
       }));
       setArticles((prevArticles) => [...prevArticles, ...articleList]);
     } catch (err) {
@@ -102,14 +106,18 @@ export default function Index() {
       setLoading(true);
       setError(null);
       const response = await fetch(
-        `https://en.wikipedia.org/w/api.php?format=json&action=query&list=search&srsearch=${encodeURIComponent(query)}&prop=extracts&exintro&explaintext&origin=*`,
+        `https://en.wikipedia.org/w/api.php?format=json&action=query&list=search&srsearch=${encodeURIComponent(query)}&prop=extracts|pageimages&piprop=thumbnail&pithumbsize=500&exintro&explaintext&origin=*`,
       );
       const data = await response.json();
-      const searchResults: Article[] = data.query.search.map((result: SearchResult) => ({
-        id: result.pageid,
-        title: result.title,
-        extract: result.snippet.replace(/<\/?[^>]+(>|$)/g, ''),
-      }));
+      const searchResults: Article[] = data.query.search.map((result: SearchResult) => {
+        const page = data.query.pages?.[result.pageid] || {};
+        return {
+          id: result.pageid,
+          title: result.title,
+          extract: result.snippet.replace(/<\/?[^>]+(>|$)/g, ''),
+          image: page?.thumbnail?.source,
+        };
+      });
       setArticles(searchResults);
     } catch (err) {
       if (err instanceof Error) {
@@ -126,7 +134,7 @@ export default function Index() {
     fetchRandomArticles();
   }, []);
 
-  const renderArticle = ({ item }) => (
+  const renderArticle = ({ item }: { item: Article }) => (
     <View style={styles.slide}>
       <ArticleScreen article={item} />
     </View>
@@ -146,34 +154,26 @@ export default function Index() {
         />
       </View>
 
-      {error ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{i18n.t('errorLoading')}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchRandomArticles}>
-            <Text style={styles.retryText}>{i18n.t('tryAgain')}</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <FlatList
-          data={articles}
-          renderItem={renderArticle}
-          keyExtractor={(item) => item.id.toString()}
-          pagingEnabled
-          snapToInterval={height}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          onEndReached={() => !searchQuery && fetchRandomArticles()}
-          onEndReachedThreshold={0.1}
-          ListFooterComponent={
-            loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#0000ff" />
-                <Text>{i18n.t('loading')}</Text>
-              </View>
-            ) : null
-          }
-        />
-      )}
+      <FlashList
+        data={articles}
+        renderItem={renderArticle}
+        keyExtractor={(item) => item.id.toString()}
+        pagingEnabled
+        snapToInterval={height}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        estimatedItemSize={838}
+        onEndReached={() => !searchQuery && fetchRandomArticles()}
+        onEndReachedThreshold={0.1}
+        ListFooterComponent={
+          loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#0000ff" />
+              <Text>{i18n.t('loading')}</Text>
+            </View>
+          ) : null
+        }
+      />
     </View>
   );
 }
@@ -197,17 +197,23 @@ const styles = StyleSheet.create({
   },
   slide: {
     height: height,
-    justifyContent: 'center',
+    overflow: 'hidden',
   },
   articleContainer: {
     flex: 1,
     padding: 20,
-    justifyContent: 'center',
+    gap: 16,
+  },
+  articleImage: {
+    width: '100%',
+    height: 400,
+    objectFit: 'cover',
+    resizeMode: 'cover',
+    borderRadius: 8,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 10,
   },
   extract: {
     fontSize: 16,
