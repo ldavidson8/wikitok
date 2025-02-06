@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -8,6 +8,8 @@ import {
   Text,
   TextInput,
   View,
+  TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Localization from 'expo-localization';
@@ -60,9 +62,12 @@ const ArticleScreen = ({ article }: { article: Article }) => {
 
 export default function Index() {
   const [articles, setArticles] = useState<Article[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const flashListRef = useRef<FlashList<Article>>(null);
 
   const fetchRandomArticles = async () => {
     try {
@@ -139,6 +144,22 @@ export default function Index() {
       <ArticleScreen article={item} />
     </View>
   );
+
+  const handleScroll = (event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setShowScrollToTop(offsetY > height);
+  };
+
+  const scrollToTop = () => {
+    flashListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setArticles([]);
+    fetchRandomArticles().finally(() => setRefreshing(false));
+  }, []);
+
   const { height } = Dimensions.get('window');
   return (
     <View style={styles.container}>
@@ -155,6 +176,7 @@ export default function Index() {
       </View>
 
       <FlashList
+        ref={flashListRef}
         data={articles}
         renderItem={renderArticle}
         keyExtractor={(item) => item.id.toString()}
@@ -165,6 +187,8 @@ export default function Index() {
         estimatedItemSize={838}
         onEndReached={() => !searchQuery && fetchRandomArticles()}
         onEndReachedThreshold={0.1}
+        onScroll={handleScroll}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListFooterComponent={
           loading ? (
             <View style={styles.loadingContainer}>
@@ -174,6 +198,12 @@ export default function Index() {
           ) : null
         }
       />
+
+      {showScrollToTop && (
+        <TouchableOpacity style={styles.scrollToTopButton} onPress={scrollToTop}>
+          <Text style={styles.scrollToTopText}>^</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -206,7 +236,7 @@ const styles = StyleSheet.create({
   },
   articleImage: {
     width: '100%',
-    height: 400,
+    height: 300,
     objectFit: 'cover',
     resizeMode: 'cover',
     borderRadius: 8,
@@ -242,5 +272,20 @@ const styles = StyleSheet.create({
   retryText: {
     color: '#fff',
     fontSize: 16,
+  },
+  scrollToTopButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollToTopText: {
+    color: 'white',
+    fontSize: 24,
   },
 });
