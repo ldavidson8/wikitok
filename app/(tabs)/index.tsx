@@ -50,11 +50,24 @@ const WikiAPI = {
   },
 
   searchArticles: async (query: string): Promise<Article[]> => {
+    if (!query.trim()) return [];
     const response = await fetch(
-      `https://en.wikipedia.org/w/api.php?format=json&action=query&list=search&srsearch=${encodeURIComponent(query)}&prop=extracts|info&exintro&explaintext&inprop=url&origin=*`,
+      `https://en.wikipedia.org/w/api.php?format=json&action=query&list=search&srsearch=${encodeURIComponent(
+        query,
+      )}&prop=info&inprop=url&origin=*`,
     );
     const data = await response.json();
-    return data.query.search as Article[];
+
+    // Transform search results to match Article type
+    const articles = data.query.search.map((result: any) => ({
+      ...result,
+      pageid: result.pageid,
+      title: result.title,
+      extract: result.snippet.replace(/<\/?[^>]+(>|$)/g, ''), // Remove HTML tags
+      fullurl: `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title)}`,
+    }));
+
+    return articles;
   },
 };
 
@@ -84,6 +97,7 @@ export default function MainScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeSearch, setActiveSearch] = useState<string>('');
   const [refreshing, setRefreshing] = useState(false);
 
   const {
@@ -94,9 +108,9 @@ export default function MainScreen() {
     status,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['articles', searchQuery],
+    queryKey: ['articles', activeSearch],
     queryFn: ({ pageParam = 0 }) =>
-      searchQuery ? WikiAPI.searchArticles(searchQuery) : WikiAPI.getRandomArticles(),
+      searchQuery ? WikiAPI.searchArticles(activeSearch) : WikiAPI.getRandomArticles(),
     getNextPageParam: (lastPage: Article[], pages: Article[][]) => {
       if (lastPage.length < 10) return undefined;
       return pages.length;
@@ -104,6 +118,15 @@ export default function MainScreen() {
     initialPageParam: 0,
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
+
+  const handleSearch = () => {
+    setActiveSearch(searchQuery.trim());
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setActiveSearch('');
+  };
 
   const flatArticles = useMemo(() => {
     if (!articles) return [];
@@ -149,14 +172,23 @@ export default function MainScreen() {
       <StatusBar style="auto" />
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder={i18n.t('search')}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          <TouchableOpacity style={styles.bookmarkButton} onPress={() => router.push('/bookmarks')}>
-            <MaterialIcons name="bookmarks" size={24} color="#007AFF" />
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder={i18n.t('search')}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+              onSubmitEditing={handleSearch}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity style={styles.clearButton} onPress={clearSearch}>
+                <MaterialIcons name="clear" size={20} color="#666" />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+            <MaterialIcons name="search" size={24} color="#fff" />
           </TouchableOpacity>
         </View>
 
@@ -198,14 +230,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  inputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderColor: '#ddd',
+    borderWidth: 1,
+  },
   searchInput: {
     flex: 1,
     height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 20,
     paddingHorizontal: 15,
-    backgroundColor: '#fff',
+  },
+  clearButton: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchButton: {
+    backgroundColor: '#007AFF',
+    padding: 8,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   bookmarkButton: {
     padding: 8,
