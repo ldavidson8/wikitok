@@ -1,9 +1,15 @@
 import { Tabs } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { Pressable } from 'react-native';
 
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#0d56a5',
+        tabBarButton: (props) => <Pressable {...props} android_ripple={{ color: 'transparent' }} />,
+      }}>
       <Tabs.Screen
         name="index"
         options={{

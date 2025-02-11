@@ -82,7 +82,7 @@ const ArticleScreen = ({ article }: { article: Article }) => {
           <MaterialIcons
             name={isBookmarked ? 'bookmark' : 'bookmark-border'}
             size={24}
-            color="#007AFF"
+            color="#0d56a5"
           />
         </TouchableOpacity>
       </View>
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0d56a5',
     padding: 8,
     borderRadius: 20,
     width: 40,
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   webButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0d56a5',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     padding: 10,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0d56a5',
     borderRadius: 5,
   },
   retryText: {
