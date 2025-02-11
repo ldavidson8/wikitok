@@ -16,7 +16,7 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import * as Localization from 'expo-localization';
 import { I18n } from 'i18n-js';
 import { Article } from '@/lib/types';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBookmarkStore } from '@/lib/stores/bookmarks';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -62,7 +62,7 @@ const ArticleScreen = ({ article }: { article: Article }) => {
   const { bookmarks, toggleBookmark } = useBookmarkStore();
   const isBookmarked = bookmarks.some((b) => b.pageid === article.pageid);
   return (
-    <View style={styles.articleContainer}>
+    <View>
       <View style={styles.articleHeader}>
         <Text style={styles.title}>{article.title}</Text>
         <TouchableOpacity style={styles.bookmarkIconButton} onPress={() => toggleBookmark(article)}>
@@ -73,13 +73,14 @@ const ArticleScreen = ({ article }: { article: Article }) => {
           />
         </TouchableOpacity>
       </View>
-      <Text style={styles.extract}>{article.extract}</Text>
+      <Text style={styles.extract} numberOfLines={25} ellipsizeMode="tail">
+        {article.extract}
+      </Text>
     </View>
   );
 };
 
 export default function MainScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -115,8 +116,10 @@ export default function MainScreen() {
         <ArticleScreen article={item} />
 
         <TouchableOpacity
-          style={[styles.webButton, { bottom: insets.bottom + 20 }]} // Adjust position dynamically
-          onPress={() => router.push({ pathname: '/article', params: { url: item.fullurl } })}>
+          style={styles.webButton}
+          onPress={() =>
+            router.push({ pathname: '/article', params: { url: item.fullurl, title: item.title } })
+          }>
           <Text style={styles.webButtonText}>{i18n.t('openInWeb')}</Text>
         </TouchableOpacity>
       </View>
@@ -230,12 +233,9 @@ const styles = StyleSheet.create({
   extract: {
     fontSize: 16,
     lineHeight: 24,
+    flexShrink: 1,
   },
   webButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
     backgroundColor: '#007AFF',
     padding: 15,
     borderRadius: 8,

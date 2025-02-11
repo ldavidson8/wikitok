@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Article } from '@/lib/types';
 import { useBookmarkStore } from '@/lib/stores/bookmarks';
 import { useEffect } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function BookmarksScreen() {
   const { bookmarks, removeBookmark, loadBookmarks } = useBookmarkStore();
@@ -42,22 +43,24 @@ export default function BookmarksScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Bookmarks</Text>
+    <SafeAreaView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Bookmarks</Text>
+        </View>
+        <FlashList
+          data={bookmarks}
+          renderItem={renderItem}
+          estimatedItemSize={100}
+          keyExtractor={(item) => item.pageid.toString()}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No bookmarks yet</Text>
+            </View>
+          }
+        />
       </View>
-      <FlashList
-        data={bookmarks}
-        renderItem={renderItem}
-        estimatedItemSize={100}
-        keyExtractor={(item) => item.pageid.toString()}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No bookmarks yet</Text>
-          </View>
-        }
-      />
-    </View>
+    </SafeAreaView>
   );
 }
 
