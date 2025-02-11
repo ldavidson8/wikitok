@@ -40,7 +40,7 @@ const translations = {
 };
 
 const i18n = new I18n(translations);
-i18n.locale = Localization.locale;
+i18n.locale = Localization.getLocales()[0].languageCode!;
 i18n.enableFallback = true;
 
 interface Article {
