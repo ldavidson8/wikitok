@@ -103,13 +103,13 @@ const styles = StyleSheet.create({
   actionButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 6,
+    borderRadius: 12,
     backgroundColor: '#4DB6AC',
   },
   actionButtonText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   removeButton: {
     backgroundColor: '#fff',
