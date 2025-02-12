@@ -1,10 +1,24 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+} from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { Article } from '@/lib/types';
 import { useBookmarkStore } from '@/lib/stores/bookmarks';
 import { useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental &&
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function BookmarksScreen() {
   const { bookmarks, removeBookmark, loadBookmarks } = useBookmarkStore();
@@ -14,11 +28,29 @@ export default function BookmarksScreen() {
     loadBookmarks();
   }, [loadBookmarks]);
 
+  const handleRemoveBookmark = (pageid: number) => {
+    removeBookmark(pageid);
+    LayoutAnimation.configureNext({
+      duration: 300,
+      update: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+      },
+      delete: {
+        duration: 200,
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+    });
+  };
+
   const renderItem = ({ item }: { item: Article }) => (
-    <View style={styles.bookmarkItem}>
+    <Animated.View
+      exiting={FadeOut.duration(200)}
+      layout={LinearTransition.duration(200)}
+      style={styles.bookmarkItem}>
       <View style={styles.content}>
         <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.extract} numberOfLines={2}>
+        <Text style={styles.extract} numberOfLines={5}>
           {item.extract}
         </Text>
       </View>
@@ -35,11 +67,11 @@ export default function BookmarksScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.removeButton]}
-          onPress={() => removeBookmark(item.pageid)}>
+          onPress={() => handleRemoveBookmark(item.pageid)}>
           <Text style={[styles.actionButtonText, styles.removeButtonText]}>Remove</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 
   return (
@@ -85,7 +117,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   content: {
-    marginBottom: 8,
+    marginBottom: 12,
   },
   title: {
     fontSize: 18,
