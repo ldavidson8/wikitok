@@ -7,7 +7,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#0d56a5',
+        tabBarActiveTintColor: '#4DB6AC',
         tabBarButton: (props) => <Pressable {...props} android_ripple={{ color: 'transparent' }} />,
       }}>
       <Tabs.Screen

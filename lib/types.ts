@@ -3,4 +3,9 @@ export type Article = {
   title: string;
   extract: string;
   fullurl: string;
+  thumbnail?: {
+    source: string;
+    width: number;
+    height: number;
+  };
 };

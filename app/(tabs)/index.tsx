@@ -8,6 +8,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { StatusBar } from 'expo-status-bar';
@@ -19,22 +20,9 @@ import { Article } from '@/lib/types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBookmarkStore } from '@/lib/stores/bookmarks';
 import { useCallback, useMemo, useState } from 'react';
+import { translations } from '@/lib/translations';
 
 const { height } = Dimensions.get('window');
-
-const translations = {
-  en: {
-    search: 'Search Wikipedia...',
-    loading: 'Loading...',
-    errorLoading: 'Error loading articles',
-    tryAgain: 'Try again',
-    bookmark: 'Bookmark',
-    removeBookmark: 'Remove bookmark',
-    openInWeb: 'Read Full Article',
-    bookmarks: 'Bookmarks',
-    share: 'Share',
-  },
-};
 
 const i18n = new I18n(translations);
 i18n.locale = Localization.getLocales()[0].languageCode!;
@@ -43,7 +31,7 @@ i18n.enableFallback = true;
 const WikiAPI = {
   getRandomArticles: async (): Promise<Article[]> => {
     const response = await fetch(
-      'https://en.wikipedia.org/w/api.php?format=json&action=query&generator=random&grnnamespace=0&prop=extracts|info&exintro&explaintext&grnlimit=10&inprop=url&origin=*',
+      'https://en.wikipedia.org/w/api.php?format=json&action=query&generator=random&grnnamespace=0&prop=extracts|info|pageimages&exintro&explaintext&grnlimit=10&inprop=url&pithumbsize=500&origin=*',
     );
     const data = await response.json();
     return Object.values(data.query.pages) as Article[];
@@ -54,18 +42,30 @@ const WikiAPI = {
     const response = await fetch(
       `https://en.wikipedia.org/w/api.php?format=json&action=query&list=search&srsearch=${encodeURIComponent(
         query,
-      )}&prop=info&inprop=url&origin=*`,
+      )}&prop=info|pageimages&inprop=url&pithumbsize=500&origin=*`,
     );
     const data = await response.json();
 
-    // Transform search results to match Article type
-    const articles = data.query.search.map((result: any) => ({
-      ...result,
-      pageid: result.pageid,
-      title: result.title,
-      extract: result.snippet.replace(/<\/?[^>]+(>|$)/g, ''), // Remove HTML tags
-      fullurl: `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title)}`,
-    }));
+    // Get additional details including images for each article
+    const titles = data.query.search.map((result: any) => result.title).join('|');
+    const detailsResponse = await fetch(
+      `https://en.wikipedia.org/w/api.php?format=json&action=query&titles=${encodeURIComponent(
+        titles,
+      )}&prop=extracts|pageimages&exintro&explaintext&pithumbsize=500&origin=*`,
+    );
+    const detailsData = await detailsResponse.json();
+    const detailsMap = detailsData.query.pages;
+
+    const articles = data.query.search.map((result: any) => {
+      const details = detailsMap[result.pageid];
+      return {
+        pageid: result.pageid,
+        title: result.title,
+        extract: details?.extract || result.snippet.replace(/<\/?[^>]+(>|$)/g, ''),
+        fullurl: `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title)}`,
+        thumbnail: details?.thumbnail,
+      };
+    });
 
     return articles;
   },
@@ -74,19 +74,28 @@ const WikiAPI = {
 const ArticleScreen = ({ article }: { article: Article }) => {
   const { bookmarks, toggleBookmark } = useBookmarkStore();
   const isBookmarked = bookmarks.some((b) => b.pageid === article.pageid);
+
+  const maxLines = Math.floor((height * 0.4) / 24);
   return (
     <View>
+      {article.thumbnail?.source && (
+        <Image
+          source={{ uri: article.thumbnail.source }}
+          style={styles.articleImage}
+          resizeMode="cover"
+        />
+      )}
       <View style={styles.articleHeader}>
         <Text style={styles.title}>{article.title}</Text>
         <TouchableOpacity style={styles.bookmarkIconButton} onPress={() => toggleBookmark(article)}>
           <MaterialIcons
             name={isBookmarked ? 'bookmark' : 'bookmark-border'}
             size={24}
-            color="#0d56a5"
+            color="#4DB6AC"
           />
         </TouchableOpacity>
       </View>
-      <Text style={styles.extract} numberOfLines={25} ellipsizeMode="tail">
+      <Text style={styles.extract} numberOfLines={maxLines} ellipsizeMode="tail">
         {article.extract}
       </Text>
     </View>
@@ -103,7 +112,6 @@ export default function MainScreen() {
   const {
     data: articles,
     fetchNextPage,
-    hasNextPage,
     isFetchingNextPage,
     status,
     refetch,
@@ -200,13 +208,13 @@ export default function MainScreen() {
           snapToInterval={height}
           snapToAlignment="start"
           decelerationRate="fast"
-          onEndReached={() => hasNextPage && fetchNextPage()}
-          onEndReachedThreshold={0.1}
+          onEndReachedThreshold={0.2}
+          onEndReached={fetchNextPage}
           estimatedItemSize={height}
           ListFooterComponent={
             isFetchingNextPage ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#0000ff" />
+                <ActivityIndicator size="large" color="#8B5CF6" />
                 <Text>{i18n.t('loading')}</Text>
               </View>
             ) : null
@@ -221,80 +229,111 @@ export default function MainScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff', // Keep the main background white
   },
   searchContainer: {
-    padding: 10,
-    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    backgroundColor: '#E0F7FA', // Light mint green background
+    borderRadius: 16,
+    marginHorizontal: 12,
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   inputContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    borderColor: '#ddd',
-    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.8)', // Semi-transparent white
+    borderRadius: 12,
+    borderWidth: 0,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
   },
   searchInput: {
     flex: 1,
     height: 40,
-    paddingHorizontal: 15,
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  searchButton: {
+    backgroundColor: '#4DB6AC', // Mint green button
+    padding: 10,
+    borderRadius: 30,
+    width: 42,
+    height: 42,
+    display: 'flex',
+    marginLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#4DB6AC',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
   clearButton: {
     padding: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  searchButton: {
-    backgroundColor: '#0d56a5',
-    padding: 8,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bookmarkButton: {
-    padding: 8,
-  },
   articleContainer: {
     flex: 1,
     padding: 20,
     gap: 16,
   },
+  articleImage: {
+    width: '100%',
+    height: 250,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
   articleHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
     flex: 1,
-    marginRight: 16,
+    marginRight: 12,
   },
   bookmarkIconButton: {
-    padding: 8,
+    padding: 10,
+    borderRadius: 50,
+    backgroundColor: '#E0F7FA',
   },
   extract: {
     fontSize: 16,
     lineHeight: 24,
-    flexShrink: 1,
+    color: '#444',
+    marginTop: 8,
+    fontWeight: '400',
   },
   webButton: {
-    backgroundColor: '#0d56a5',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
+    backgroundColor: '#4DB6AC',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    marginTop: 12,
+    shadowColor: '#4DB6AC',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   webButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '500',
   },
   loadingContainer: {
     padding: 20,
@@ -313,7 +352,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     padding: 10,
-    backgroundColor: '#0d56a5',
+    backgroundColor: '#4DB6AC',
     borderRadius: 5,
   },
   retryText: {
